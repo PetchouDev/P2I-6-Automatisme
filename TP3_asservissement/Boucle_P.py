@@ -23,6 +23,7 @@ KP_arriere = 2
 dist = capteur.value()
 
 # erreur 
+consigne=[                      ]
 erreur = lambda d: (d - 20) * 100 / 20
 
 data = {
