@@ -1,0 +1,108 @@
+#!/usr/bin/python3
+from time import time, sleep
+import json 
+from sys import stderr
+from threading import Thread
+from math import pi, cos, sin, tan, acos, atan2
+
+from ev3dev2.motor import Motor, OUTPUT_A, OUTPUT_C
+from ev3dev2.led import Leds
+
+from data import *
+from mgi import mgi
+from mgd import mgd
+
+
+clamp = lambda v, amplitude: min(amplitude, max(-amplitude, v))
+
+# classes des moteurs
+class Moteur(Thread):
+    def __init__(self, output, amplitude):
+        Thread.__init__(self)
+        # initialisation du moteur
+        self.motor = Motor(output)
+
+        # initialisation des parametres
+        self.motor.reset()
+
+        # consigne d'angle du moteur
+        self.consigne = 0
+
+        # angle max
+        self.amplitude = amplitude
+
+        # start 
+        self.start()
+
+    def run(self):
+        self.running = True
+        while self.running:
+            error = self.consigne - self.motor.position
+            
+            self.motor.on(clamp(error, 100))
+
+    def set_consigne(self, consigne):
+        self.consigne = clamp(consigne, self.amplitude)
+
+    def kill(self):
+        self.running = False
+        self.join()
+        self.motor.on(0)
+
+    def set_consigne(self, consigne):
+        self.consigne = clamp(consigne, self.amplitude)
+        
+    @property
+    def position(self):
+        return self.motor.position
+
+
+# declaration des moteurs 
+moteur_1 = Moteur(OUTPUT_A, amplitude=100)
+moteur_2 = Moteur(OUTPUT_C, amplitude=110)
+
+
+# leds
+leds = Leds()
+
+# initialisation de la consigne 
+ini = (L1 + L2, 0) # depart en cartésien
+dests = [ini, (0,6), (6,6)] # destination en cartésien
+
+
+print('Ready')
+# allumer les leds en vert
+leds.set_color("LEFT", "GREEN")
+leds.set_color("RIGHT", "GREEN")
+
+
+for i in range(len(dests) - 1):
+    points = traj(dests[i], dests[i+1])
+    for x, y in points:
+        # determiner phi2
+        pos = moteur_2.position
+
+        phi_1, phi_2 = mgi(x, y, pos)
+
+
+        moteur_1.set_consigne(phi_2)
+        moteur_2.set_consigne(phi_2)
+        sleep(1)
+        print("-------------------")
+        x_reel, y_reel = mgd(rad(moteur_1.motor.position), rad(moteur_2.motor.position))
+        print("point M : ({}, {}) => {}, {}".format(x, y, x_reel, y_reel))
+        print("position: {}, {}".format(moteur_1.motor.position, moteur_2.motor.position))
+        print("consigne: {}, {}".format(phi_1, phi_2))
+
+
+        sleep(1)
+
+    
+
+    
+
+print('Done')
+
+# arret des moteurs
+moteur_1.kill()
+moteur_2.kill()
